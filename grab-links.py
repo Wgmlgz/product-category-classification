@@ -68,7 +68,7 @@ async def grab(pattern: re.Pattern[str], full_pattern: re.Pattern[str], folder: 
                 print('write')
         except:
             print('timeout error!')
-            q.extend(url)
+            q.append(url)
             await browser.close()
             page, browser = await get_page()
 
