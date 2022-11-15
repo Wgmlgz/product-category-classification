@@ -22,9 +22,9 @@ async def grab(
     used_path: str,
     q_path: str,
     found_path: str,
-    update_queue = True
-    ):
-    
+    update_queue=True
+):
+
     base = 'https://www.ozon.ru'
     page, browser = await get_page()
 
@@ -62,7 +62,7 @@ async def grab(
             continue
         used.add(url)
         try:
-            await page.goto(url, {'waitUntil': 'networkidle0'})
+            await page.goto(url, {'waitUntil': 'networkidle0', 'timeout': 10000})
             page_content = await page.content()
             links = grab_categories(page_content)
             if update_queue:
@@ -71,7 +71,7 @@ async def grab(
             print('done', count)
 
             count += 1
-            if count % 1 == 0:
+            if count % 10 == 0:
                 open(used_path, 'w+').write('\n'.join(used))
                 open(found_path, 'w+').write('\n'.join(found))
                 open(q_path, 'w+').write('\n'.join(q))
@@ -100,4 +100,5 @@ if __name__ == '__main__':
         used_path='./parse/products/used.txt',
         found_path='./parse/products/found.txt',
         q_path='./parse/products/queue.txt',
-        ))
+        update_queue=False
+    ))

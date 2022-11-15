@@ -25,5 +25,6 @@ for link in found:
     all.append(i)
 
 print(len(all))
-
+import random
+random.shuffle(all)
 open('../parse/products/queue.txt', 'w+').write('\n'.join(all))
