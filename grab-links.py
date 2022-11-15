@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from pyppeteer import launch
 import os
 from collections import deque
-
+import asyncio
 
 async def get_page():
     browser = await launch()
@@ -22,7 +22,7 @@ async def get_page():
 
 
  
-async def grab(pattern, folder):
+async def grab(pattern: re.Pattern[str], folder: str):
   base = 'https://www.ozon.ru'
   page, browser = await get_page()
   
@@ -34,7 +34,7 @@ async def grab(pattern, folder):
     soup = BeautifulSoup(page_content)
     links = set()
     for a in soup.find_all('a', href=True):
-        if re.fullmatch('\/category\/[^\/]+\\d+\/', a['href']) is not None:
+        if re.fullmatch(pattern, a['href']) is not None:
             link = base + a['href']
             if link in found_categories:
                 continue
@@ -45,12 +45,12 @@ async def grab(pattern, folder):
     return links
 
   used_categories = set(map(lambda s: s.strip(), filter(None, open(
-      './used_categories.txt', 'r').readlines())))
+      folder + '/used.txt', 'r').readlines())))
   found_categories = set(map(lambda s: s.strip(), filter(None, open(
-      './found_categories.txt', 'r').readlines())))
+      folder + '/found.txt', 'r').readlines())))
   queue_categories.clear()
   queue_categories.extend(map(lambda s: s.strip(), filter(None, open(
-      './queue_categories.txt', 'r').readlines())))
+      folder + '/queue.txt', 'r').readlines())))
 
   count = 0
 
@@ -64,20 +64,20 @@ async def grab(pattern, folder):
           page_content = await page.content()
           links = grab_categories(page_content)
           queue_categories.extend(list(links))
-          print('done')
+          print('done', count)
           
           count += 1
-          if count == 3:
-            open('./used_categories.txt', 'w+').write('\n'.join(used_categories), )
-            open('./found_categories.txt', 'w+').write('\n'.join(found_categories))
-            open('./queue_categories.txt', 'w+').write('\n'.join(queue_categories))
+          if count % 3 == 0:
+            open(folder + '/used.txt', 'w+').write('\n'.join(used_categories), )
+            open(folder + '/found.txt', 'w+').write('\n'.join(found_categories))
+            open(folder + '/queue.txt', 'w+').write('\n'.join(queue_categories))
             print('write')
       except:
           print('timeout error!')
           queue_categories.extend(url)
           await browser.close()
-          page = await get_page()
+          page, browser = await get_page()
           
 
 
-grab()
+asyncio.run(grab(re.compile('\/category\/[^\/]+\\d+\/'), './parse/categories'))
