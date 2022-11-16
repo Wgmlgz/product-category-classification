@@ -1,5 +1,7 @@
 import json
+import math
 import random
+import time
 from bs4 import BeautifulSoup as bs
 import requests
 import re
@@ -10,6 +12,7 @@ import os
 from collections import deque
 import asyncio
 
+TICKS = 10
 
 async def get_page():
     browser = await launch()
@@ -89,10 +92,19 @@ async def grab(
     random.shuffle(q_data)
     q.extend(q_data)
 
-    count = 0
+    count = 1
 
     skipped = 0
+    avg_time = 0
+    min_req_time = float('inf')
+    max_req_time = 0
+    min_avg_time = float('inf')
+    max_avg_time = 0
+    abs_min_time = float('inf')
+    abs_max_time = 0
+    timeouts = 0
     while len(q) != 0:
+        start_time = time.time()
         url = q.popleft()
         if url in used:
             skipped += 1
@@ -104,9 +116,9 @@ async def grab(
         path = url[19:]
         api_url = 'https://www.ozon.ru/api/composer-api.bx/page/json/v2?url=' + path
         base_url = 'https://www.ozon.ru' + path
-
+        
         try:
-            await page.goto(api_url, {'waitUntil': 'networkidle0', 'timeout': 10000})
+            await page.goto(api_url, {'waitUntil': 'networkidle0', 'timeout': 11000})
             page_content = await page.content()
             product = grab_product_api(page_content)
 
@@ -115,20 +127,35 @@ async def grab(
             product.update(grab_product_base(page_content))
 
             used.add(url)
-            
-            print('done', count)
             found[path] = product
+            end_time = time.time() - start_time
+            avg_time += end_time / TICKS
+            min_req_time = min(min_req_time, end_time)
+            max_req_time = max(max_req_time, end_time)
+            abs_min_time = min(abs_min_time, end_time)
+            abs_max_time = max(abs_max_time, end_time)
+            print('done', count, f"in {end_time:.3f}s")
             count += 1
-            if count % 10 == 0:
+            if count % TICKS == 0:
                 open(used_path, 'w+').write('\n'.join(used))
                 open(found_path, 'w+',
                      encoding='utf8').write(json.dumps(found, ensure_ascii=False))
                 # open(q_path, 'w+').write('\n'.join(q))
-                print('write')
+                min_avg_time = min(min_avg_time, avg_time)
+                max_avg_time = max(max_avg_time, avg_time)
+            
+                print(f'write (Average time: {"{:.3f}".format(avg_time)}s)  Min: {min_req_time:.3f}s Max: {max_req_time:.3f}s')
+                print(f"Min avg time: {min_avg_time:.3f}s Max avg time: {max_avg_time:.3f}s")    
+                print(f"Abs min time: {abs_min_time:.3f}s Abs max time: {abs_max_time:.3f}s") 
+                print(f"Total timeouts: {timeouts} Ratio: {(timeouts / count):.5f}")
+                min_req_time = float('inf')
+                max_req_time = 0
+                avg_time = 0
         except Exception as e:
+            timeouts += 1
             print(e)
             print('timeout error!')
-            q.appendleft(url)
+            q.append(url)
             await browser.close()
             page, browser = await get_page()
 
