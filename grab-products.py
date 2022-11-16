@@ -11,8 +11,13 @@ from pyppeteer import launch
 import os
 from collections import deque
 import asyncio
+from alive_progress.styles import showtime, show_spinners
+from alive_progress import alive_bar
+from alive_progress.animations import bouncing_spinner_factory
+from termcolor import colored
 
 TICKS = 10
+
 
 async def get_page():
     browser = await launch()
@@ -79,11 +84,11 @@ async def grab(
         data = soup.find('div', {'id': 'section-description'}
                          )
         if data is not None:
-          data = data.find('div', {'class': 'ra-a1'})
+            data = data.find('div', {'class': 'ra-a1'})
         description = ''
         if data is not None:
-          description = data.text
-        
+            description = data.text
+
         return {'description': description}
 
     used = set([i.strip() for i in open(used_path, 'r').readlines()])
@@ -93,7 +98,6 @@ async def grab(
     q.extend(q_data)
 
     count = 1
-
     skipped = 0
     avg_time = 0
     min_req_time = float('inf')
@@ -103,61 +107,66 @@ async def grab(
     abs_min_time = float('inf')
     abs_max_time = 0
     timeouts = 0
-    while len(q) != 0:
-        start_time = time.time()
-        url = q.popleft()
-        if url in used:
-            skipped += 1
-            continue
-        if skipped != 0:
-            print('skipped', skipped)
-        skipped = 0
-        'https://www.ozon.ru'
-        path = url[19:]
-        api_url = 'https://www.ozon.ru/api/composer-api.bx/page/json/v2?url=' + path
-        base_url = 'https://www.ozon.ru' + path
-        
-        try:
-            await page.goto(api_url, {'waitUntil': 'networkidle0', 'timeout': 11000})
-            page_content = await page.content()
-            product = grab_product_api(page_content)
+    crab = bouncing_spinner_factory((colored(r'Y (••) Y', 'red'), colored(r'Y (  ) Y', 'red')), 15, background='.,.,,..,.,',
+                                    hide=False, overlay=True)  # hey it's Ferris #rustacean!
+    with alive_bar(enrich_print=False, length=100, spinner=crab, spinner_length=30, bar=None, calibrate=10, dual_line=True) as bar:
+        while len(q) != 0:
+            bar.title = f'Parsing {count}'
+            start_time = time.time()
+            url = q.popleft()
+            if url in used:
+                skipped += 1
+                continue
+            if skipped != 0:
+                print(colored(f'skipped {skipped}', 'magenta'))
+            skipped = 0
+            'https://www.ozon.ru'
+            path = url[19:]
+            api_url = 'https://www.ozon.ru/api/composer-api.bx/page/json/v2?url=' + path
+            base_url = 'https://www.ozon.ru' + path
 
-            await page.goto(base_url, {'waitUntil': 'networkidle0', 'timeout': 10000})
-            page_content = await page.content()
-            product.update(grab_product_base(page_content))
+            try:
+                await page.goto(api_url, {'waitUntil': 'networkidle0', 'timeout': 11000})
+                page_content = await page.content()
+                product = grab_product_api(page_content)
 
-            used.add(url)
-            found[path] = product
-            end_time = time.time() - start_time
-            avg_time += end_time / TICKS
-            min_req_time = min(min_req_time, end_time)
-            max_req_time = max(max_req_time, end_time)
-            abs_min_time = min(abs_min_time, end_time)
-            abs_max_time = max(abs_max_time, end_time)
-            print('done', count, f"in {end_time:.3f}s")
-            count += 1
-            if count % TICKS == 0:
-                open(used_path, 'w+').write('\n'.join(used))
-                open(found_path, 'w+',
-                     encoding='utf8').write(json.dumps(found, ensure_ascii=False))
-                # open(q_path, 'w+').write('\n'.join(q))
-                min_avg_time = min(min_avg_time, avg_time)
-                max_avg_time = max(max_avg_time, avg_time)
-            
-                print(f'write (Average time: {"{:.3f}".format(avg_time)}s)  Min: {min_req_time:.3f}s Max: {max_req_time:.3f}s')
-                print(f"Min avg time: {min_avg_time:.3f}s Max avg time: {max_avg_time:.3f}s")    
-                print(f"Abs min time: {abs_min_time:.3f}s Abs max time: {abs_max_time:.3f}s") 
-                print(f"Total timeouts: {timeouts} Ratio: {(timeouts / count):.5f}")
-                min_req_time = float('inf')
-                max_req_time = 0
-                avg_time = 0
-        except Exception as e:
-            timeouts += 1
-            print(e)
-            print('timeout error!')
-            q.append(url)
-            await browser.close()
-            page, browser = await get_page()
+                await page.goto(base_url, {'waitUntil': 'networkidle0', 'timeout': 10000})
+                page_content = await page.content()
+                product.update(grab_product_base(page_content))
+
+                used.add(url)
+                found[path] = product
+                end_time = time.time() - start_time
+                avg_time += end_time / TICKS
+                min_req_time = min(min_req_time, end_time)
+                max_req_time = max(max_req_time, end_time)
+                abs_min_time = min(abs_min_time, end_time)
+                abs_max_time = max(abs_max_time, end_time)
+                print(colored(f"done in {end_time:.1f}s", 'green'))
+                count += 1
+
+                bar.text = colored(f'-> write (Average time: {"{:.1f}".format(avg_time)}s) ' + \
+                    f"min: {abs_min_time:.1f}s max: {abs_max_time:.1f}s " + \
+                    f"T/O: {timeouts} ({(timeouts / count):.1f}/s)", 'grey')
+                if count % TICKS == 0:
+                    open(used_path, 'w+').write('\n'.join(used))
+                    open(found_path, 'w+',
+                         encoding='utf8').write(json.dumps(found, ensure_ascii=False))
+                    # open(q_path, 'w+').write('\n'.join(q))
+                    min_avg_time = min(min_avg_time, avg_time)
+                    max_avg_time = max(max_avg_time, avg_time)
+                    print(
+                        f"Min avg time: {min_avg_time:.1f}s Max avg time: {max_avg_time:.1f}s")
+                    min_req_time = float('inf')
+                    max_req_time = 0
+                    avg_time = 0
+            except Exception as e:
+                timeouts += 1
+                print(colored(str(e), 'red'))
+                q.append(url)
+                await browser.close()
+                page, browser = await get_page()
+            bar()
 
 
 # if __name__ == '__main__':
