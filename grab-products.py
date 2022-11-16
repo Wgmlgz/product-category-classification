@@ -112,6 +112,7 @@ async def grab(
     with alive_bar(enrich_print=False, length=100, spinner=crab, spinner_length=30, bar=None, calibrate=10, dual_line=True) as bar:
         while len(q) != 0:
             bar.title = f'Parsing {count}'
+            
             start_time = time.time()
             url = q.popleft()
             if url in used:
@@ -142,8 +143,15 @@ async def grab(
                 max_req_time = max(max_req_time, end_time)
                 abs_min_time = min(abs_min_time, end_time)
                 abs_max_time = max(abs_max_time, end_time)
-                print(colored(f"done in {end_time:.1f}s", 'green'))
                 count += 1
+                print(colored(f"done in {end_time:.1f}s", 'green'))
+                
+                used.update(set([i.strip() for i in open(used_path, 'r').readlines()]))
+                found.update(json.loads(open(found_path, 'r', encoding='utf-8').read()))
+                # q_data = [i.strip() for i in open(q_path, 'r').readlines()]
+                # random.shuffle(q_data)
+                # q.extend(q_data)
+                print(colored('read', 'yellow'))
 
                 bar.text = colored(f'-> write (Average time: {"{:.1f}".format(avg_time)}s) ' + \
                     f"min: {abs_min_time:.1f}s max: {abs_max_time:.1f}s " + \
