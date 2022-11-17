@@ -145,13 +145,16 @@ async def grab(
                 abs_max_time = max(abs_max_time, end_time)
                 count += 1
                 print(colored(f"done in {end_time:.1f}s", 'green'))
-                
-                used.update(set([i.strip() for i in open(used_path, 'r').readlines()]))
-                found.update(json.loads(open(found_path, 'r', encoding='utf-8').read()))
+                try:
+                    used.update(set([i.strip() for i in open(used_path, 'r').readlines()]))
+                    found.update(json.loads(open(found_path, 'r', encoding='utf-8').read()))
+                except Exception as e: 
+                    print(colored('read error', 'red'))
+                    print(e)
+                print(colored('read', 'yellow'))
                 # q_data = [i.strip() for i in open(q_path, 'r').readlines()]
                 # random.shuffle(q_data)
                 # q.extend(q_data)
-                print(colored('read', 'yellow'))
 
                 bar.text = colored(f'-> write (Average time: {"{:.1f}".format(avg_time)}s) ' + \
                     f"min: {abs_min_time:.1f}s max: {abs_max_time:.1f}s " + \
