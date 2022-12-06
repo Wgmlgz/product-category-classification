@@ -150,7 +150,7 @@ async def grab(
             # random.shuffle(q_data)
             # q.extend(q_data)
 
-            if count % TICKS == 0:
+            if count % TICKS == 0 or len(q) == 0:
                 open(used_path, 'w+').write('\n'.join(used))
                 open(found_path, 'w+',
                         encoding='utf8').write(json.dumps(found, ensure_ascii=False))
