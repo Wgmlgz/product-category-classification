@@ -87,7 +87,10 @@ async def grab(
         if data is not None:
             description = data.text
 
-        return {'description': description}
+        img = soup.find('div', {'data-widget': 'webGallery'})
+        if img is not None:
+            img = list(set(re.sub('/wc\d+', '', i['src']) for i in img.find_all('img')))
+        return {'description': description, 'imgs': img}
 
     used = set([i.strip() for i in open(used_path, 'r').readlines()])
     found = json.loads(open(found_path, 'r', encoding='utf-8').read())
@@ -118,7 +121,6 @@ async def grab(
         path = url[19:]
         api_url = 'https://www.ozon.ru/api/composer-api.bx/page/json/v2?url=' + path
         base_url = 'https://www.ozon.ru' + path
-
         try:
             await page.goto(api_url, {'waitUntil': 'networkidle0', 'timeout': 11000})
             page_content = await page.content()
